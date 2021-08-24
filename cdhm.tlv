@@ -28,8 +28,9 @@
    m4_asm(ADDI, x13, x13, 1)            // Increment loop count by 1
    m4_asm(BLT, x13, x12, 1111111111000) // If a3 is less than a2, branch to label named <loop>
    // Test result value in x14, and set x31 to reflect pass/fail.
-   m4_asm(ADDI, x30, x14, 111111010100) // Subtract expected value of 44 to set x30 to 1 if and only iff the result is 45 (1 + 2 + ... + 9).
-   m4_asm(BGE, x0, x0, 0) // Done. Jump to itself (infinite loop). (Up to 20-bit signed immediate plus implicit 0 bit (unlike JALR) provides byte address; last immediate bit should also be 0)
+   m4_asm(ADDI, x30, x14, 111111010100) // Subtract expected value of 44 to set x30 to 1 if and only iff the result is 45
+   m4_asm(BGE, x0, x0, 0)               // Done. Jump to itself (infinite loop).
+
    m4_asm_end()
    m4_define(['M4_MAX_CYC'], 50)
    //---------------------------------------------------------------------------------
@@ -46,6 +47,7 @@
    // PC
    
    $next_pc[31:0] = $reset ? 0 :
+                    $taken_br ? $br_tgt_pc :
                     $pc + 4;
    $pc[31:0] = >>1$next_pc;
   
@@ -66,7 +68,7 @@
    $is_bltu = $decode_bits ==? 17'bxxxxxxx_110_1100011;
    $is_bgeu = $decode_bits ==? 17'bxxxxxxx_111_1100011;
    
-   $is_add  = $decode_bits ==? 17'bx0xxxxx_000_1100011;
+   $is_add  = $decode_bits ==? 17'bx0xxxxx_000_0110011;
    $is_addi = $decode_bits ==? 17'bxxxxxxx_000_0010011;
    
    $op_bits[6:0] = $instr[6:0];
@@ -125,13 +127,33 @@
                 $is_j_instr ? $j_imm :
                 32'b0;
 
+   // Register file
+   // Note that reads frox x0 always return 0
    m4+rf(32, 32, $reset, $rd_valid, $rd, $wr_data[31:0], $rs1_valid, $rs1, $rs1_data, $rs2_valid, $rs2, $rs2_data)
 
-   $src1_value[31:0] = $rs1_data;
-   $src2_value[31:0] = $rs2_data;
+   $wr_data[31:0]    = $rd == 0 ? 0 : $result;
+   $src1_value[31:0] = $rs1 == 0 ? 0 : $rs1_data;
+   $src2_value[31:0] = $rs2 == 0 ? 0 : $rs2_data;
    
+   // ALU
+   $result[31:0] = $is_add  ? $src1_value + $src2_value :
+                   $is_addi ? $src1_value + $imm :
+                              0;
+   
+   // Branching
+   $sign_diff = $src1_value[31] != $src2_value[31];
+   $taken_br = 
+              ($is_beq   && ($src1_value == $src2_value)) ||
+              ($is_bne   && ($src1_value != $src2_value)) ||
+              ($is_blt   && (($src1_value < $src2_value)  ^ $sign_diff)) ||
+              ($is_bge   && (($src1_value >= $src2_value) ^ $sign_diff)) ||
+              ($is_bltu  && ($src1_value < $src2_value)) ||
+              ($is_bgeu  && ($src1_value >= $src2_value));
+   $br_tgt_pc[31:0] = $pc + $imm;
+  
    // Assert these to end simulation (before Makerchip cycle limit).
-   *passed = 1'b0;
+   //*passed = 1'b0;
+   m4+tb()
    *failed = *cyc_cnt > M4_MAX_CYC;
 
    `BOGUS_USE($rd $rd_valid $rs1 $rs1_valid $rs2 $rs2_valid $funct3 $funct7 $imm_valid $imm)
@@ -140,6 +162,8 @@
    m4+cpu_viz()
 \SV
    endmodule
+
+
 
 
 
