@@ -20,21 +20,21 @@
    //  x13 (a3): 1..10
    //  x14 (a4): Sum
    // 
-   m4_asm(ADDI, x14, x0, 0)             // Initialize sum register a4 with 0
-   m4_asm(ADDI, x12, x0, 1010)          // Store count of 10 in register a2.
-   m4_asm(ADDI, x13, x0, 1)             // Initialize loop count register a3 with 0
-   // Loop:
-   m4_asm(ADD, x14, x13, x14)           // Incremental summation
-   m4_asm(ADDI, x13, x13, 1)            // Increment loop count by 1
-   m4_asm(BLT, x13, x12, 1111111111000) // If a3 is less than a2, branch to label named <loop>
-   // Test result value in x14, and set x31 to reflect pass/fail.
-   m4_asm(ADDI, x30, x14, 111111010100) // Subtract expected value of 44 to set x30 to 1 if and only iff the result is 45
-   m4_asm(BGE, x0, x0, 0)               // Done. Jump to itself (infinite loop).
-
-   m4_asm_end()
+   //m4_asm(ADDI, x14, x0, 0)             // Initialize sum register a4 with 0
+   //m4_asm(ADDI, x12, x0, 1010)          // Store count of 10 in register a2.
+   //m4_asm(ADDI, x13, x0, 1)             // Initialize loop count register a3 with 0
+   //// Loop:
+   //m4_asm(ADD, x14, x13, x14)           // Incremental summation
+   //m4_asm(ADDI, x13, x13, 1)            // Increment loop count by 1
+   //m4_asm(BLT, x13, x12, 1111111111000) // If a3 is less than a2, branch to label named <loop>
+   //// Test result value in x14, and set x31 to reflect pass/fail.
+   //m4_asm(ADDI, x30, x14, 111111010100) // Subtract expected value of 44 to set x30 to 1 if and only iff the result is 45
+   //m4_asm(BGE, x0, x0, 0)               // Done. Jump to itself (infinite loop).
+   //
+   //m4_asm_end()
    m4_define(['M4_MAX_CYC'], 50)
    //---------------------------------------------------------------------------------
-
+   m4_test_prog()
 
 
 \SV
@@ -61,15 +61,42 @@
    $funct7[6:0] = $instr[31:25];  
    $decode_bits[16:0] = {$funct7, $funct3, $opcode};
    
-   $is_beq  = $decode_bits ==? 17'bxxxxxxx_000_1100011;
-   $is_bne  = $decode_bits ==? 17'bxxxxxxx_001_1100011;
-   $is_blt  = $decode_bits ==? 17'bxxxxxxx_100_1100011;
-   $is_bge  = $decode_bits ==? 17'bxxxxxxx_101_1100011;
-   $is_bltu = $decode_bits ==? 17'bxxxxxxx_110_1100011;
-   $is_bgeu = $decode_bits ==? 17'bxxxxxxx_111_1100011;
    
-   $is_add  = $decode_bits ==? 17'bx0xxxxx_000_0110011;
-   $is_addi = $decode_bits ==? 17'bxxxxxxx_000_0010011;
+   $is_lui   = $decode_bits ==? 17'bxxxxxxx_xxx_0110111;
+   $is_auipc = $decode_bits ==? 17'bxxxxxxx_xxx_0010111;
+   $is_jal   = $decode_bits ==? 17'bxxxxxxx_xxx_1101111;
+   $is_jalr  = $decode_bits ==? 17'bxxxxxxx_000_1100111;
+
+   $is_beq   = $decode_bits ==? 17'bxxxxxxx_000_1100011;
+   $is_bne   = $decode_bits ==? 17'bxxxxxxx_001_1100011;
+   $is_blt   = $decode_bits ==? 17'bxxxxxxx_100_1100011;
+   $is_bge   = $decode_bits ==? 17'bxxxxxxx_101_1100011;
+   $is_bltu  = $decode_bits ==? 17'bxxxxxxx_110_1100011;
+   $is_bgeu  = $decode_bits ==? 17'bxxxxxxx_111_1100011;
+   
+   $is_addi  = $decode_bits ==? 17'bxxxxxxx_000_0010011;
+   $is_slti  = $decode_bits ==? 17'bxxxxxxx_010_0010011;
+   $is_sltiu = $decode_bits ==? 17'bxxxxxxx_011_0010011;
+   $is_xori  = $decode_bits ==? 17'bxxxxxxx_100_0010011;
+   $is_ori   = $decode_bits ==? 17'bxxxxxxx_110_0010011;
+   $is_andi  = $decode_bits ==? 17'bxxxxxxx_111_0010011;
+   $is_slli  = $decode_bits ==? 17'bx0xxxxx_001_0010011;
+   $is_srli  = $decode_bits ==? 17'bx0xxxxx_101_0010011;
+   $is_srai  = $decode_bits ==? 17'bx1xxxxx_101_0010011;
+
+   $is_add   = $decode_bits ==? 17'bx0xxxxx_000_0110011;
+   $is_sub   = $decode_bits ==? 17'bx1xxxxx_000_0110011;
+   $is_sll   = $decode_bits ==? 17'bx0xxxxx_001_0110011;
+   $is_slt   = $decode_bits ==? 17'bx0xxxxx_010_0110011;
+   $is_sltu  = $decode_bits ==? 17'bx0xxxxx_011_0110011;
+   $is_xor   = $decode_bits ==? 17'bx0xxxxx_100_0110011;
+   $is_srl   = $decode_bits ==? 17'bx0xxxxx_101_0110011;
+   $is_sra   = $decode_bits ==? 17'bx1xxxxx_101_0110011;
+   $is_or    = $decode_bits ==? 17'bx0xxxxx_110_0110011;
+   $is_and   = $decode_bits ==? 17'bx0xxxxx_111_0110011;
+
+   $is_load  = $decode_bits ==? 17'bxxxxxxx_xxx_0000011;
+   $is_store = $decode_bits ==? 17'bxxxxxxx_xxx_0100011;
    
    $op_bits[6:0] = $instr[6:0];
    
@@ -136,8 +163,46 @@
    $src2_value[31:0] = $rs2 == 0 ? 0 : $rs2_data;
    
    // ALU
-   $result[31:0] = $is_add  ? $src1_value + $src2_value :
+   $zext_src1_value[62:0] = { 31'b0, $src1_value};
+   $sext_src1_value[62:0] = { {31{$src1_value[31]}}, $src1_value};
+   $sra_result[62:0] = $sext_src1_value >> $src2_value[4:0];
+   $srai_result[62:0] = $sext_src1_value >> $imm[4:0];
+   
+   $sltu_result[31:0] = { 31'b0, $src1_value < $src2_value};
+   $sltiu_result[31:0] = { 31'b0, $src1_value < $imm};
+
+   $result[31:0] = 
+                   $is_andi ? $src1_value & $imm :
+                   $is_ori  ? $src1_value | $imm :
+                   $is_xori ? $src1_value ^ $imm :
                    $is_addi ? $src1_value + $imm :
+                   $is_slli ? $src1_value << $imm[4:0] :
+                   $is_srli ? $src1_value >> $imm[4:0] :
+                   
+                   $is_and  ? $src1_value & $src2_value :
+                   $is_or   ? $src1_value | $src2_value :
+                   $is_xor  ? $src1_value ^ $src2_value :
+                   $is_add  ? $src1_value + $src2_value :
+                   $is_sub  ? $src1_value - $src2_value :
+                   $is_sll  ? $src1_value << $src2_value :
+                   $is_srl  ? $src1_value >> $src2_value :
+                   
+                   $is_sltu  ? $sltu_result :
+                   $is_sltiu ? $sltiu_result :
+                   $is_lui   ? {$imm[31:12], 12'b0 } :
+                   $is_auipc ? $pc + $imm :
+                   $is_jal   ? $pc + 32'd4 :
+                   $is_jalr  ? $pc + 32'd4 :
+                   
+                   $is_slt   ? ( $src1_value[31] == $src_value[31] ?
+                                      $sltu_result :
+                                      { 31'b0, $src1_value[31]} ) :
+                   $is_slti  ? ( $src1_value[31] == $imm[31] ?
+                                      $sltiu_result :
+                                      { 31'b0, $src1_value[31]} ) :
+                   $is_sra   ? $sra_result[31:0] :
+                   $is_srai  ? $srai_result[31:0] :
+                   
                               0;
    
    // Branching
@@ -162,6 +227,7 @@
    m4+cpu_viz()
 \SV
    endmodule
+
 
 
 
