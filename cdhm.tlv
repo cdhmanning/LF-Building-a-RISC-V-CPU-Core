@@ -47,7 +47,8 @@
    // PC
    
    $next_pc[31:0] = $reset ? 0 :
-                    $taken_br ? $br_tgt_pc :
+                    ($is_jal || $taken_br) ? $br_tgt_pc :
+                    $is_jalr ? $jalr_tgt_pc :
                     $pc + 4;
    $pc[31:0] = >>1$next_pc;
   
@@ -60,7 +61,6 @@
    $funct3[2:0] = $instr[14:12];
    $funct7[6:0] = $instr[31:25];  
    $decode_bits[16:0] = {$funct7, $funct3, $opcode};
-   
    
    $is_lui   = $decode_bits ==? 17'bxxxxxxx_xxx_0110111;
    $is_auipc = $decode_bits ==? 17'bxxxxxxx_xxx_0010111;
@@ -158,7 +158,9 @@
    // Note that reads frox x0 always return 0
    m4+rf(32, 32, $reset, $rd_valid, $rd, $wr_data[31:0], $rs1_valid, $rs1, $rs1_data, $rs2_valid, $rs2, $rs2_data)
 
-   $wr_data[31:0]    = $rd == 0 ? 0 : $result;
+   $wr_data[31:0]    = $rd == 0 ? 0 :
+                       $is_load ? $ld_data :
+                       $result;
    $src1_value[31:0] = $rs1 == 0 ? 0 : $rs1_data;
    $src2_value[31:0] = $rs2 == 0 ? 0 : $rs2_data;
    
@@ -194,7 +196,7 @@
                    $is_jal   ? $pc + 32'd4 :
                    $is_jalr  ? $pc + 32'd4 :
                    
-                   $is_slt   ? ( $src1_value[31] == $src_value[31] ?
+                   $is_slt   ? ( $src1_value[31] == $src2_value[31] ?
                                       $sltu_result :
                                       { 31'b0, $src1_value[31]} ) :
                    $is_slti  ? ( $src1_value[31] == $imm[31] ?
@@ -202,7 +204,6 @@
                                       { 31'b0, $src1_value[31]} ) :
                    $is_sra   ? $sra_result[31:0] :
                    $is_srai  ? $srai_result[31:0] :
-                   
                               0;
    
    // Branching
@@ -215,6 +216,12 @@
               ($is_bltu  && ($src1_value < $src2_value)) ||
               ($is_bgeu  && ($src1_value >= $src2_value));
    $br_tgt_pc[31:0] = $pc + $imm;
+   $jalr_tgt_pc[31:0] = $src1_value + $imm;
+  
+   // DMEM
+   $addr[31:0] = $src1_value + $imm;
+   m4+dmem(32, 32, $reset, $addr[6:2], $is_store, $src2_value, $is_load, $ld_data[31:0])
+
   
    // Assert these to end simulation (before Makerchip cycle limit).
    //*passed = 1'b0;
@@ -227,9 +234,6 @@
    m4+cpu_viz()
 \SV
    endmodule
-
-
-
 
 
 
